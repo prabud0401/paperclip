@@ -44,7 +44,6 @@ diagnostics/
 .claude/settings.local.json
 .paperclip-local/
 /.idea/
-/.agents/
 
 # Doc maintenance cursor
 .doc-review-cursor
