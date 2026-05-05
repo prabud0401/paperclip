@@ -1,8 +1,8 @@
 @echo off
 REM Auto-start Paperclip dev server after logon if nothing is listening on port 3100.
-REM Scheduled task: PaperclipDevAutoStart. Edit PAPERCLIP_ROOT if your clone differs.
+REM Scheduled task: PaperclipDevAutoStart. Repo root = parent of this scripts\ folder (any clone path).
 setlocal EnableExtensions
-set "PAPERCLIP_ROOT=D:\Paperclip\paperclip"
+for %%I in ("%~dp0..") do set "PAPERCLIP_ROOT=%%~fI"
 
 if not exist "%PAPERCLIP_ROOT%\package.json" (
   echo [%date% %time%] paperclip-autostart: missing repo at "%PAPERCLIP_ROOT%"
