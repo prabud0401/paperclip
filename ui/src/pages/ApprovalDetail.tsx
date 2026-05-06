@@ -80,7 +80,7 @@ export function ApprovalDetail() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.approvals.list(approval.companyId, "pending"),
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(approval.companyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(approval.companyId) });
     }
   };
 

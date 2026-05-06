@@ -370,6 +370,7 @@ export type StorageProvider = (typeof STORAGE_PROVIDERS)[number];
 export const BILLING_TYPES = [
   "metered_api",
   "subscription_included",
+  "subscription_estimate",
   "subscription_overage",
   "credits",
   "fixed",

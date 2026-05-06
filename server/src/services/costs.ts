@@ -11,7 +11,11 @@ export interface CostDateRange {
 }
 
 const METERED_BILLING_TYPE = "metered_api";
-const SUBSCRIPTION_BILLING_TYPES = ["subscription_included", "subscription_overage"] as const;
+const SUBSCRIPTION_BILLING_TYPES = [
+  "subscription_included",
+  "subscription_estimate",
+  "subscription_overage",
+] as const;
 
 function sumAsNumber(column: typeof costEvents.costCents | typeof costEvents.inputTokens | typeof costEvents.cachedInputTokens | typeof costEvents.outputTokens) {
   return sql<number>`coalesce(sum(${column}), 0)::double precision`;

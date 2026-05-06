@@ -64,6 +64,7 @@ import {
   Slash,
   RotateCcw,
   Trash2,
+  Undo2,
   Plus,
   Key,
   Eye,
@@ -774,7 +775,7 @@ export function AgentDetail() {
   }, [agent?.companyId, selectedCompanyId, setSelectedCompanyId]);
 
   const agentAction = useMutation({
-    mutationFn: async (action: "invoke" | "pause" | "resume" | "approve" | "terminate") => {
+    mutationFn: async (action: "invoke" | "pause" | "resume" | "approve" | "terminate" | "reactivate") => {
       if (!agentLookupRef) return Promise.reject(new Error("No agent reference"));
       switch (action) {
         case "invoke": return agentsApi.invoke(agentLookupRef, resolvedCompanyId ?? undefined);
@@ -782,6 +783,7 @@ export function AgentDetail() {
         case "resume": return agentsApi.resume(agentLookupRef, resolvedCompanyId ?? undefined);
         case "approve": return agentsApi.approve(agentLookupRef, resolvedCompanyId ?? undefined);
         case "terminate": return agentsApi.terminate(agentLookupRef, resolvedCompanyId ?? undefined);
+        case "reactivate": return agentsApi.reactivate(agentLookupRef, resolvedCompanyId ?? undefined);
       }
     },
     onSuccess: (data, action) => {
@@ -791,7 +793,8 @@ export function AgentDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.runtimeState(agentLookupRef) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.taskSessions(agentLookupRef) });
       if (resolvedCompanyId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(resolvedCompanyId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(resolvedCompanyId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.orgPrefix(resolvedCompanyId) });
         if (agent?.id) {
           queryClient.invalidateQueries({ queryKey: queryKeys.heartbeats(resolvedCompanyId, agent.id) });
         }
@@ -818,7 +821,7 @@ export function AgentDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.budgets.overview(resolvedCompanyId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(routeAgentRef) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentLookupRef) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(resolvedCompanyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(resolvedCompanyId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(resolvedCompanyId) });
     },
   });
@@ -829,7 +832,7 @@ export function AgentDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(routeAgentRef) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentLookupRef) });
       if (resolvedCompanyId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(resolvedCompanyId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(resolvedCompanyId) });
       }
     },
   });
@@ -855,7 +858,7 @@ export function AgentDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(routeAgentRef) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentLookupRef) });
       if (resolvedCompanyId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(resolvedCompanyId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(resolvedCompanyId) });
       }
     },
     onError: (err) => {
@@ -912,6 +915,8 @@ export function AgentDetail() {
     return <Navigate to={`/agents/${canonicalAgentRef}/dashboard`} replace />;
   }
   const isPendingApproval = agent.status === "pending_approval";
+  const isTerminated = agent.status === "terminated";
+  const actionControlsDisabled = agentAction.isPending || isPendingApproval || isTerminated;
   const showConfigActionBar = (activeView === "configuration" || activeView === "instructions") && (configDirty || configSaving);
 
   return (
@@ -946,14 +951,14 @@ export function AgentDetail() {
           </Button>
           <RunButton
             onClick={() => agentAction.mutate("invoke")}
-            disabled={agentAction.isPending || isPendingApproval}
+            disabled={actionControlsDisabled}
             label="Run Heartbeat"
           />
           <PauseResumeButton
             isPaused={agent.status === "paused"}
             onPause={() => agentAction.mutate("pause")}
             onResume={() => agentAction.mutate("resume")}
-            disabled={agentAction.isPending || isPendingApproval}
+            disabled={actionControlsDisabled}
           />
           <span className="hidden sm:inline"><StatusBadge status={agent.status} /></span>
           {mobileLiveRun && (
@@ -993,10 +998,12 @@ export function AgentDetail() {
                   resetTaskSession.mutate(null);
                   setMoreOpen(false);
                 }}
+                disabled={isTerminated}
               >
                 <RotateCcw className="h-3 w-3" />
                 Reset Sessions
               </button>
+              {!isTerminated ? (
               <button
                 className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent/50 text-destructive"
                 onClick={() => {
@@ -1007,6 +1014,18 @@ export function AgentDetail() {
                 <Trash2 className="h-3 w-3" />
                 Terminate
               </button>
+              ) : (
+              <button
+                className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent/50"
+                onClick={() => {
+                  agentAction.mutate("reactivate");
+                  setMoreOpen(false);
+                }}
+              >
+                <Undo2 className="h-3 w-3" />
+                Restore agent
+              </button>
+              )}
             </PopoverContent>
           </Popover>
         </div>
@@ -1032,6 +1051,22 @@ export function AgentDetail() {
         </Tabs>
       )}
 
+      {isTerminated && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+          <span>
+            This agent is terminated. Keys were revoked. Restore to show it in the sidebar again, then create a new API key under Configuration if the adapter needs one.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => agentAction.mutate("reactivate")}
+            disabled={agentAction.isPending}
+          >
+            <Undo2 className="h-3.5 w-3.5 sm:mr-1" />
+            <span>Restore agent</span>
+          </Button>
+        </div>
+      )}
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
       {isPendingApproval && (
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/30 dark:text-amber-200">
@@ -1578,7 +1613,7 @@ function ConfigurationTab({
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agent.id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agent.urlKey) });
       queryClient.invalidateQueries({ queryKey: queryKeys.agents.configRevisions(agent.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(agent.companyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(agent.companyId) });
     },
     onError: (err) => {
       setAwaitingRefreshAfterSave(false);

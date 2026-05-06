@@ -203,7 +203,7 @@ export function Costs() {
     if (!selectedCompanyId) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.budgets.overview(selectedCompanyId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(selectedCompanyId) });
-    queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(selectedCompanyId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(selectedCompanyId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.projects.list(selectedCompanyId) });
   };
 
@@ -583,7 +583,7 @@ export function Costs() {
             <MetricTile
               label="Inference spend"
               value={formatCents(spendData?.summary.spendCents ?? 0)}
-              subtitle={`${formatTokens(inferenceTokenTotal)} tokens across request-scoped events`}
+              subtitle={`${formatTokens(inferenceTokenTotal)} tokens · includes Composer list-price estimates when Cursor subscription runs omit CLI USD`}
               icon={DollarSign}
             />
             <MetricTile
@@ -659,7 +659,9 @@ export function Costs() {
                   <CardHeader className="px-5 pt-5 pb-2">
                     <CardTitle className="text-base">Inference ledger</CardTitle>
                     <CardDescription>
-                      Request-scoped inference spend for the selected period.
+                      Request-scoped totals for the period. Cursor subscription agents may record{" "}
+                      <span className="text-foreground/90">Est. list price (Cursor Composer)</span> rows when token
+                      usage is known but the CLI does not attach dollar amounts.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4 px-5 pb-5 pt-2">

@@ -124,7 +124,7 @@ export function NewAgent() {
     mutationFn: (data: Record<string, unknown>) =>
       agentsApi.hire(selectedCompanyId!, data),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(selectedCompanyId!) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(selectedCompanyId!) });
       queryClient.invalidateQueries({ queryKey: queryKeys.approvals.list(selectedCompanyId!) });
       navigate(agentUrl(result.agent));
     },

@@ -38,6 +38,7 @@ export type AdapterBillingType =
   | "subscription"
   | "metered_api"
   | "subscription_included"
+  | "subscription_estimate"
   | "subscription_overage"
   | "credits"
   | "fixed"

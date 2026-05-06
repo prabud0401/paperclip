@@ -76,14 +76,16 @@ export function Agents() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const { data: agents, isLoading, error } = useQuery({
-    queryKey: queryKeys.agents.list(selectedCompanyId!),
-    queryFn: () => agentsApi.list(selectedCompanyId!),
+    queryKey: queryKeys.agents.list(selectedCompanyId!, { includeTerminated: showTerminated }),
+    queryFn: () =>
+      agentsApi.list(selectedCompanyId!, { includeTerminated: showTerminated }),
     enabled: !!selectedCompanyId,
   });
 
   const { data: orgTree } = useQuery({
-    queryKey: queryKeys.org(selectedCompanyId!),
-    queryFn: () => agentsApi.org(selectedCompanyId!),
+    queryKey: queryKeys.org(selectedCompanyId!, { includeTerminated: showTerminated }),
+    queryFn: () =>
+      agentsApi.org(selectedCompanyId!, { includeTerminated: showTerminated }),
     enabled: !!selectedCompanyId && effectiveView === "org",
   });
 

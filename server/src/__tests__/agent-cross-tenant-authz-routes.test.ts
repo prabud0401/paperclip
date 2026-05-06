@@ -51,6 +51,7 @@ const mockAgentService = vi.hoisted(() => ({
   pause: vi.fn(),
   resume: vi.fn(),
   terminate: vi.fn(),
+  reactivate: vi.fn(),
   remove: vi.fn(),
   listKeys: vi.fn(),
   createApiKey: vi.fn(),

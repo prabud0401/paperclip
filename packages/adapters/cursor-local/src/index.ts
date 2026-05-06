@@ -3,12 +3,16 @@ import type { AdapterModelProfileDefinition } from "@paperclipai/adapter-utils";
 export const type = "cursor";
 export const label = "Cursor CLI (local)";
 
-export const DEFAULT_CURSOR_LOCAL_MODEL = "auto";
+export const DEFAULT_CURSOR_LOCAL_MODEL = "composer-2";
 
 const CURSOR_FALLBACK_MODEL_IDS = [
   "auto",
+  "composer-2",
+  "composer-2-fast",
   "composer-1.5",
+  "composer-1.5-fast",
   "composer-1",
+  "composer-1-fast",
   "gpt-5.3-codex-low",
   "gpt-5.3-codex-low-fast",
   "gpt-5.3-codex",
@@ -79,7 +83,7 @@ Core fields:
 - cwd (string, optional): default absolute working directory fallback for the agent process (created if missing when possible)
 - instructionsFilePath (string, optional): absolute path to a markdown instructions file prepended to the run prompt
 - promptTemplate (string, optional): run prompt template
-- model (string, optional): Cursor model id (for example auto or gpt-5.3-codex)
+- model (string, optional): Cursor model id (defaults to composer-2; examples: auto, composer-2, gpt-5.3-codex)
 - mode (string, optional): Cursor execution mode passed as --mode (plan|ask). Leave unset for normal autonomous runs.
 - command (string, optional): defaults to "agent"
 - extraArgs (string[], optional): additional CLI args
@@ -93,6 +97,7 @@ Notes:
 - Runs are executed with: agent -p --output-format stream-json ...
 - Prompts are piped to Cursor via stdin.
 - Sessions are resumed with --resume when stored session cwd matches current cwd.
+- When you authenticate via Cursor subscription (no CURSOR_API_KEY), streamed runs often omit USD from the CLI. Paperclip attaches **estimated** Composer list-price ledger rows (\`subscription_estimate\`) using published **Composer 2** standard ($0.50/M in, $2.50/M out) vs **fast** ($1.50/M in, $7.50/M out) based on model id (\`composer-2\` vs \`composer-2-fast\` / \`auto\`; Composer 1.x approximated at standard tier unless id contains \`-fast\`). Totals are informational and omitted from budgets.
 - Paperclip auto-injects local skills into "~/.cursor/skills" when missing, so Cursor can discover "$paperclip" and related skills on local runs.
 - Paperclip auto-adds --yolo unless one of --trust/--yolo/-f is already present in extraArgs.
 - Remote sandbox runs prepend "~/.local/bin" to PATH and prefer "~/.local/bin/cursor-agent" when the default Cursor entrypoint is requested, so standard E2B-style installs do not need hardcoded absolute command paths.

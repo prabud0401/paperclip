@@ -1218,6 +1218,8 @@ function normalizeLedgerBillingType(value: unknown): BillingType {
     case "api":
     case "metered_api":
       return "metered_api";
+    case "subscription_estimate":
+      return "subscription_estimate";
     case "subscription":
     case "subscription_included":
       return "subscription_included";

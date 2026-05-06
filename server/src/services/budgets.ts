@@ -145,7 +145,11 @@ async function computeObservedAmount(
 ) {
   if (policy.metric !== "billed_cents") return 0;
 
-  const conditions = [eq(costEvents.companyId, policy.companyId)];
+  const conditions = [
+    eq(costEvents.companyId, policy.companyId),
+    /** List-price Cursor subscription shadows are not invoiced cash; omit from budgets. */
+    ne(costEvents.billingType, "subscription_estimate"),
+  ];
   if (policy.scopeType === "agent") conditions.push(eq(costEvents.agentId, policy.scopeId));
   if (policy.scopeType === "project") conditions.push(eq(costEvents.projectId, policy.scopeId));
   const { start, end } = resolveWindow(policy.windowKind as BudgetWindowKind);

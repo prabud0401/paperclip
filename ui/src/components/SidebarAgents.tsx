@@ -220,7 +220,7 @@ export function SidebarAgents() {
     onSuccess: async (_agent, { agent, action }) => {
       if (selectedCompanyId) {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(selectedCompanyId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(selectedCompanyId) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.liveRuns(selectedCompanyId) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(selectedCompanyId) }),
         ]);

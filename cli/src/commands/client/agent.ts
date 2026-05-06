@@ -312,4 +312,183 @@ export function registerAgentCommands(program: Command): void {
       }),
     { includeCompany: false },
   );
+
+  addCommonClientOptions(
+    agent
+      .command("use-claude-local")
+      .description(
+        "Switch an agent to the claude_local adapter (Claude Code CLI) with sane defaults — install CLI only if you need it separately",
+      )
+      .argument("<agentRef>", "Agent UUID or url-key shortname")
+      .requiredOption("-C, --company-id <id>", "Company ID")
+      .option("--cwd <path>", "Working directory for runs (defaults to current directory)")
+      .option("--model <id>", 'Claude model id (default: "claude-sonnet-4-6")', "claude-sonnet-4-6")
+      .option(
+        "--command <path>",
+        'Claude CLI executable or name (defaults to "claude" on PATH)',
+      )
+      .action(async (agentRef: string, opts: AgentLocalCliOptions & { cwd?: string; model?: string; command?: string }) => {
+        try {
+          const ctx = resolveCommandContext(opts, { requireCompany: true });
+          const companyId = ctx.companyId!;
+          const qs = new URLSearchParams({ companyId });
+          const existing = await ctx.api.get<Agent>(
+            `/api/agents/${encodeURIComponent(agentRef)}?${qs.toString()}`,
+          );
+          if (!existing || !existing.id) {
+            throw new Error(`Agent not found: ${agentRef}`);
+          }
+
+          const cwd =
+            opts.cwd?.trim() ||
+            process.env.PAPERCLIP_CLAUDE_CWD?.trim() ||
+            process.cwd();
+          const command = opts.command?.trim();
+          const model = opts.model?.trim() || "claude-sonnet-4-6";
+
+          const adapterConfig: Record<string, unknown> = {
+            cwd,
+            model,
+            dangerouslySkipPermissions: true,
+          };
+          if (command) adapterConfig.command = command;
+
+          const updated = await ctx.api.patch<Agent>(`/api/agents/${encodeURIComponent(existing.id)}`, {
+            adapterType: "claude_local",
+            adapterConfig,
+            replaceAdapterConfig: true,
+          });
+          if (!updated) throw new Error("PATCH returned empty response");
+
+          if (ctx.json) {
+            printOutput(updated, { json: true });
+            return;
+          }
+          console.log(`Updated agent ${existing.name} (${existing.id}) → claude_local`);
+          console.log(`  cwd=${cwd}`);
+          console.log(`  model=${model}`);
+          console.log(`  command=${(command ?? "claude (PATH)")}`);
+        } catch (err) {
+          handleCommandError(err);
+        }
+      }),
+    { includeCompany: false },
+  );
+
+  addCommonClientOptions(
+    agent
+      .command("use-gemini-local")
+      .description(
+        "Switch an agent to gemini_local (Google Gemini CLI). Optional: seed GEMINI_API_KEY from an env var (never paste keys on the CLI).",
+      )
+      .argument("<agentRef>", "Agent UUID or url-key shortname")
+      .requiredOption("-C, --company-id <id>", "Company ID")
+      .option("--cwd <path>", "Working directory for runs (defaults to current directory)")
+      .option("--model <id>", 'Gemini model id (default: "gemini-2.5-flash")', "gemini-2.5-flash")
+      .option("--command <path>", 'Gemini CLI executable or name (defaults to "gemini" on PATH)')
+      .option(
+        "--api-key-env <name>",
+        "Read plaintext API key from this process.env name, store as encrypted company secret, bind to adapter env GEMINI_API_KEY",
+      )
+      .action(
+        async (
+          agentRef: string,
+          opts: AgentLocalCliOptions & {
+            cwd?: string;
+            model?: string;
+            command?: string;
+            apiKeyEnv?: string;
+          },
+        ) => {
+          try {
+            const ctx = resolveCommandContext(opts, { requireCompany: true });
+            const companyId = ctx.companyId!;
+            const qs = new URLSearchParams({ companyId });
+            const existing = await ctx.api.get<Agent>(
+              `/api/agents/${encodeURIComponent(agentRef)}?${qs.toString()}`,
+            );
+            if (!existing || !existing.id) {
+              throw new Error(`Agent not found: ${agentRef}`);
+            }
+
+            const cwd =
+              opts.cwd?.trim() ||
+              process.env.PAPERCLIP_GEMINI_CWD?.trim() ||
+              process.cwd();
+            const command = opts.command?.trim();
+            const model = opts.model?.trim() || "gemini-2.5-flash";
+
+            let secretBinding: Record<string, unknown> | null = null;
+
+            const envVar = opts.apiKeyEnv?.trim();
+            if (envVar) {
+              const rawKey = process.env[envVar];
+              if (!rawKey?.trim()) {
+                throw new Error(
+                  `${envVar} is empty or unset. Set it in your shell once (never pass the key as a CLI argument), then rerun.`,
+                );
+              }
+              const secretName = `gemini-api-key/agent-${existing.id}`;
+              const created = await ctx.api.post<{ id: string; name?: string }>(
+                `/api/companies/${encodeURIComponent(companyId)}/secrets`,
+                {
+                  name: secretName,
+                  description: `Gemini API key for agent ${existing.name}`,
+                  value: rawKey.trim(),
+                },
+              );
+              if (!created?.id) {
+                throw new Error("Failed to create company secret — empty response.");
+              }
+
+              secretBinding = {
+                GEMINI_API_KEY: {
+                  type: "secret_ref",
+                  secretId: created.id,
+                  version: "latest",
+                },
+              };
+
+              if (!ctx.json) {
+                console.log(`Created secret '${secretName}' (${created.id}), bound → adapter env GEMINI_API_KEY`);
+              }
+            }
+
+            const adapterConfig: Record<string, unknown> = {
+              cwd,
+              model,
+            };
+            if (command) adapterConfig.command = command;
+            if (secretBinding) {
+              adapterConfig.env = secretBinding;
+            }
+
+            const updated = await ctx.api.patch<Agent>(`/api/agents/${encodeURIComponent(existing.id)}`, {
+              adapterType: "gemini_local",
+              adapterConfig,
+              replaceAdapterConfig: true,
+            });
+            if (!updated) throw new Error("PATCH returned empty response");
+
+            if (ctx.json) {
+              printOutput(updated, { json: true });
+              return;
+            }
+            console.log(`Updated agent ${existing.name} (${existing.id}) → gemini_local`);
+            console.log(`  cwd=${cwd}`);
+            console.log(`  model=${model}`);
+            console.log(`  command=${command ?? "gemini (PATH)"}`);
+            if (!envVar) {
+              console.log("");
+              console.log(
+                "(No secret created — set GEMINI_API_KEY or GOOGLE_API_KEY via company secrets + adapter env, or rerun with --api-key-env GEMINI_API_KEY)",
+              );
+            }
+          } catch (err) {
+            handleCommandError(err);
+          }
+        },
+      ),
+    { includeCompany: false },
+  );
 }

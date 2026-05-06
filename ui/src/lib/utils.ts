@@ -94,6 +94,7 @@ export function billingTypeDisplayName(billingType: BillingType): string {
   const map: Record<BillingType, string> = {
     metered_api: "Metered API",
     subscription_included: "Subscription",
+    subscription_estimate: "Est. list price (Cursor Composer)",
     subscription_overage: "Subscription overage",
     credits: "Credits",
     fixed: "Fixed",
@@ -117,6 +118,7 @@ function coerceBillingType(value: unknown): BillingType | null {
   if (
     value === "metered_api" ||
     value === "subscription_included" ||
+    value === "subscription_estimate" ||
     value === "subscription_overage" ||
     value === "credits" ||
     value === "fixed" ||

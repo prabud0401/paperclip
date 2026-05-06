@@ -498,6 +498,27 @@ export function agentService(db: Db) {
       return getById(id);
     },
 
+    reactivate: async (id: string) => {
+      const existing = await getById(id);
+      if (!existing) return null;
+      if (existing.status !== "terminated") {
+        throw conflict("Only terminated agents can be reactivated");
+      }
+
+      const updated = await db
+        .update(agents)
+        .set({
+          status: "idle",
+          pauseReason: null,
+          pausedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(agents.id, id))
+        .returning()
+        .then((rows) => rows[0] ?? null);
+      return updated ? normalizeAgentRow(updated) : null;
+    },
+
     remove: async (id: string) => {
       const existing = await getById(id);
       if (!existing) return null;
@@ -669,11 +690,19 @@ export function agentService(db: Db) {
       return rows[0] ?? null;
     },
 
-    orgForCompany: async (companyId: string) => {
+    orgForCompany: async (companyId: string, options?: { includeTerminated?: boolean }) => {
+      const excludeTerminated =
+        typeof options?.includeTerminated === "boolean"
+          ? !options.includeTerminated
+          : true;
       const rows = await db
         .select()
         .from(agents)
-        .where(and(eq(agents.companyId, companyId), ne(agents.status, "terminated")));
+        .where(
+          excludeTerminated
+            ? and(eq(agents.companyId, companyId), ne(agents.status, "terminated"))
+            : eq(agents.companyId, companyId),
+        );
       const normalizedRows = rows.map(normalizeAgentRow);
       const byManager = new Map<string | null, typeof normalizedRows>();
       for (const row of normalizedRows) {
@@ -735,13 +764,20 @@ export function agentService(db: Db) {
       }
 
       const rows = await db.select().from(agents).where(eq(agents.companyId, companyId));
-      const matches = rows
-        .map(normalizeAgentRow)
-        .filter((agent) => agent.urlKey === urlKey && agent.status !== "terminated");
-      if (matches.length === 1) {
-        return { agent: matches[0] ?? null, ambiguous: false } as const;
+      const normalized = rows.map(normalizeAgentRow);
+      const sameKey = normalized.filter((agent) => agent.urlKey === urlKey);
+      const active = sameKey.filter((agent) => agent.status !== "terminated");
+      if (active.length === 1) {
+        return { agent: active[0] ?? null, ambiguous: false } as const;
       }
-      if (matches.length > 1) {
+      if (active.length > 1) {
+        return { agent: null, ambiguous: true } as const;
+      }
+      const terminatedOnly = sameKey.filter((agent) => agent.status === "terminated");
+      if (terminatedOnly.length === 1) {
+        return { agent: terminatedOnly[0] ?? null, ambiguous: false } as const;
+      }
+      if (terminatedOnly.length > 1) {
         return { agent: null, ambiguous: true } as const;
       }
       return { agent: null, ambiguous: false } as const;

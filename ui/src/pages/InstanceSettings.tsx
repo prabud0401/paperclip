@@ -68,7 +68,7 @@ export function InstanceSettings() {
       setActionError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.instance.schedulerHeartbeats }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(agentRow.companyId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(agentRow.companyId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(agentRow.id) }),
       ]);
     },
@@ -118,7 +118,7 @@ export function InstanceSettings() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.instance.schedulerHeartbeats }),
         ...Array.from(companies, (companyId) =>
-          queryClient.invalidateQueries({ queryKey: queryKeys.agents.list(companyId) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.agents.listPrefix(companyId) }),
         ),
         ...updatedRows.map((row) =>
           queryClient.invalidateQueries({ queryKey: queryKeys.agents.detail(row.id) }),

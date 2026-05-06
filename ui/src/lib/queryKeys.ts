@@ -13,7 +13,14 @@ export const queryKeys = {
       ["company-skills", companyId, skillId, "file", relativePath] as const,
   },
   agents: {
-    list: (companyId: string) => ["agents", companyId] as const,
+    /** Invalidate every agent-list query for this company (default + with-terminated). */
+    listPrefix: (companyId: string) => ["agents", companyId] as const,
+    list: (companyId: string, options?: { includeTerminated?: boolean }) =>
+      [
+        "agents",
+        companyId,
+        options?.includeTerminated ? ("with-terminated" as const) : ("default-list" as const),
+      ] as const,
     detail: (id: string) => ["agents", "detail", id] as const,
     runtimeState: (id: string) => ["agents", "runtime-state", id] as const,
     taskSessions: (id: string) => ["agents", "task-sessions", id] as const,
@@ -160,7 +167,13 @@ export const queryKeys = {
   runWorkspaceOperations: (runId: string) => ["heartbeat-run", runId, "workspace-operations"] as const,
   liveRuns: (companyId: string) => ["live-runs", companyId] as const,
   runIssues: (runId: string) => ["run-issues", runId] as const,
-  org: (companyId: string) => ["org", companyId] as const,
+  orgPrefix: (companyId: string) => ["org", companyId] as const,
+  org: (companyId: string, options?: { includeTerminated?: boolean }) =>
+    [
+      "org",
+      companyId,
+      options?.includeTerminated ? ("with-terminated" as const) : ("default-tree" as const),
+    ] as const,
   skills: {
     available: ["skills", "available"] as const,
   },

@@ -2,7 +2,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inferOpenAiCompatibleBiller, type AdapterExecutionContext, type AdapterExecutionResult } from "@paperclipai/adapter-utils";
+import {
+  inferOpenAiCompatibleBiller,
+  type AdapterBillingType,
+  type AdapterExecutionContext,
+  type AdapterExecutionResult,
+} from "@paperclipai/adapter-utils";
 import {
   adapterExecutionTargetIsRemote,
   adapterExecutionTargetRemoteCwd,
@@ -47,6 +52,7 @@ import { parseCursorJsonl, isCursorUnknownSessionError } from "./parse.js";
 import { prepareCursorSandboxCommand } from "./remote-command.js";
 import { normalizeCursorStreamLine } from "../shared/stream.js";
 import { hasCursorTrustBypassArg } from "../shared/trust.js";
+import { estimateCursorSubscriptionListPriceUsd } from "./estimate-cursor-subscription-usd.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -651,6 +657,31 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       stderrLine ||
       `Cursor exited with code ${attempt.proc.exitCode ?? -1}`;
 
+    const usageNonNull = attempt.parsed.usage ?? {
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+    };
+
+    let resolvedCostUsd: number | null = attempt.parsed.costUsd ?? null;
+    let outgoingBillingType: AdapterBillingType =
+      billingType === "api" ? "api" : "subscription";
+
+    if (billingType === "subscription") {
+      const estimatedUsd = estimateCursorSubscriptionListPriceUsd({
+        model,
+        inputTokens: usageNonNull.inputTokens,
+        cachedInputTokens: usageNonNull.cachedInputTokens,
+        outputTokens: usageNonNull.outputTokens,
+      });
+      const cliUsd = resolvedCostUsd;
+      const dollars = cliUsd != null && cliUsd > 0 ? cliUsd : estimatedUsd;
+      if (dollars != null && dollars > 0) {
+        resolvedCostUsd = dollars;
+        outgoingBillingType = "subscription_estimate";
+      }
+    }
+
     return {
       exitCode: attempt.proc.exitCode,
       signal: attempt.proc.signal,
@@ -659,15 +690,15 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         (attempt.proc.exitCode ?? 0) === 0
           ? null
           : fallbackErrorMessage,
-      usage: attempt.parsed.usage,
+      usage: usageNonNull,
       sessionId: resolvedSessionId,
       sessionParams: resolvedSessionParams,
       sessionDisplayId: resolvedSessionId,
       provider: providerFromModel,
       biller: resolveCursorBiller(effectiveEnv, billingType, providerFromModel),
       model,
-      billingType,
-      costUsd: attempt.parsed.costUsd,
+      billingType: outgoingBillingType,
+      costUsd: resolvedCostUsd,
       resultJson: {
         stdout: attempt.proc.stdout,
         stderr: attempt.proc.stderr,
